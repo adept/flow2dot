@@ -1,0 +1,17 @@
+Name:    flow2dot 
+Version: 0.1
+License: BSD3
+License-File: LICENSE
+Author: Dmitry Astapov <dastapov@gmail.com>
+Synopsis: Generates sequence diagrams from textual descriptions
+Homepage: http://adept.linux.kiev.ua/repos/flow2dot
+Category: Text
+Stability: Alpha
+Build-Depends: base, mtl >= 1.0, regex-posix, haskell98
+
+Executable: flow2dot
+Hs-Source-Dirs: .
+Main-Is: flow2dot.hs
+GHC-Options: -fwarn-duplicate-exports -fwarn-incomplete-patterns
+             -fwarn-overlapping-patterns -fwarn-unused-imports
+             -fwarn-unused-binds
