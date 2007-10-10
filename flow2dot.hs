@@ -212,9 +212,7 @@ getPrevTierName = do
   if (t>1) then return $ Just $ "tier" ++ show (t-1)
            else return Nothing
 
-incTier = do
-  t <- gets tier
-  setTier (t+1)
+incTier = modify (\e -> e {tier = tier e +1} )
 
 getSwimline name = do
   s <- gets swimlines
@@ -225,8 +223,7 @@ getSwimlineNodeName name = do
   return $ name ++ show (fromJust s)
 
 setSwimline name x = do 
-  s <- gets swimlines
-  modify (\f -> f {swimlines = M.insert name x s})
+  modify (\e -> e {swimlines = M.insert name x (swimlines e)})
 
 incSwimline name = do
   s <- getSwimline name
