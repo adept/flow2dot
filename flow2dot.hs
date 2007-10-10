@@ -57,7 +57,7 @@ process fname = do
 
 -- FIXME: remove "zzzz_BODY" and rework section generation to emit body last
 -- process' 
-process' flow = evalState (flow2dot flow) (DiagS M.empty M.empty 1 "zzzz_BODY")
+process' flow = evalState (flow2dot flow) (DiagS M.empty 1 "zzzz_BODY" M.empty)
 
 -- | .flow is parsed into Messages (from ---(message)---> to) 
 -- and Preformatted strings which are passed to output .dot as-is
@@ -98,22 +98,22 @@ flowStep2dot :: Flow -> Diagram ()
 flowStep2dot (Pre l) = addString l
 flowStep2dot (Msg from to message) = do
   s <- gets step
-  let sec = "step" ++ show s
-  -- Make a block where swimline nodes will be put. 
+  let block = "step" ++ show s
+  -- Make a graph block where swimline nodes for the current step will be put. 
   -- Populate it with "step anchor" node
-  withSection sec $ do addString "rank=same;"
-                       addNodeDefaults [Style Invis, Shape Point]
-                       addNode sec []
+  withSection block $ do addString "rank=same;"
+                         addNodeDefaults [Style Invis, Shape Point]
+                         addNode block []
   -- Generate swimline nodes in this section
-  f <- genNextNode sec from
-  t <- genNextNode sec to
+  f <- genNextNode block from
+  t <- genNextNode block to
   -- Add swimline step into diagram body
   addEdge f t [ Label (show s ++ ": " ++ message)
               , Constraint False
               ]
-  -- Connect step to previous
-  when (s>1) $ do let sec' = "step" ++ show (s-1)
-                  addEdge sec' sec [ Style Invis ]
+  -- Connect step to previous, which will order them properly
+  when (s>1) $ do let block' = "step" ++ show (s-1)
+                  addEdge block' block [ Style Invis ]
   setStep (s+1)
 
 -- Return the ID of the next node in the swimline `name',
