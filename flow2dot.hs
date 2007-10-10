@@ -1,3 +1,4 @@
+{-# OPTIONS -fglasgow-exts #-}
 -----------------------------------------------------------------------------
 -- |
 -- Name        :  Flow2Dot
@@ -11,8 +12,10 @@
 -----------------------------------------------------------------------------
 module Main where
 
+import Dot 
+
 import System (getArgs)
-import Control.Monad.State (State(..),evalState,gets,modify,when)
+import Control.Monad.State (State,evalState,gets,modify)
 import qualified Data.Map as M
 import Data.List (intersperse,unfoldr,splitAt)
 import Text.Regex.Posix ((=~))
@@ -80,29 +83,30 @@ process fname = do
   putStrLn $ toUTF8 $ processFlow flow
 
 -- FIXME: remove "zzzz_BODY" and rework section generation to emit body last
-processFlow flow = evalState (flow2dot flow) (DiagS M.empty 1 "zzzz_BODY" M.empty)
+processFlow flow = evalState (flow2dot flow) (DiagS M.empty 1 (DotEnv "zzzz_BODY" M.empty))
 
 -- | State of the diagram builder
 data DiagS = DiagS { swimlines::M.Map String Int
                    -- ^ name, number of nodes
                    , tier :: Int
                    -- ^ number of the next diagram tier
-                   -- 
-                   -- The following is really a second distinct State which I would like to separate out
-                   -- 
-                   , section::String
-                   -- ^ name of the current graph section
-                   , diagram::M.Map String [String]
-                   -- ^ name of section, contents
+                   , dotEnv :: DotEnv
                    }
 
 type Diagram = State DiagS
+
+instance UsesDotEnv (State DiagS) where
+  getDotcument   = gets (dotcument . dotEnv)
+  setDotcument d = modify (\e -> let de = dotEnv e in e {dotEnv = de {dotcument = d}})
+  getSection     = gets (section . dotEnv)
+  setSection s   = modify (\e -> let de = dotEnv e in e {dotEnv = de {section = s}})
+
 
 flow2dot :: [Flow] -> Diagram String
 flow2dot flow = do
   inSection "HEADING" $ addString "rank=same"
   mapM_ flowElement2dot flow
-  d <- gets diagram
+  d <- getDotcument
   return $ header ++ (concatMap genSection $ M.toList d) ++ footer
   where
     -- NB: "strict" is VERY important here
@@ -150,7 +154,7 @@ reflow str = concat $ intersperse "\\n" $ map unwords $ splitInto words_in_row w
             z = length w
             rows = z*height `div` (height+width)
             words_in_row = rows*width `div` height
-            chunk n []  = Nothing
+            chunk _ []  = Nothing
             chunk 0 lst = Just (lst, [])
             chunk n lst = Just $ splitAt n lst
             splitInto n = unfoldr (chunk n)
@@ -172,7 +176,7 @@ genNextNode sec sline nodeparams = do
   s <- getSwimline sline
   case s of
        -- Swimline already exists
-       (Just x) ->  do prev <- getSwimlineNodeName sline
+       (Just _) ->  do prev <- getSwimlineNodeName sline
                        incSwimline sline
                        next <- getSwimlineNodeName sline
                        -- Add new swimline node
@@ -228,10 +232,6 @@ incSwimline name = do
   s <- getSwimline name
   setSwimline name (fromJust s+1)
 
-setDiagram d = modify (\f -> f {diagram=d})
-
-setSection s = modify (\f -> f {section=s})
-
 -- Parser
 parseFlow fname = do
   raw <- readFile fname
@@ -244,63 +244,3 @@ parseLine l  =
             []      -> Pre l
             (match:_) -> Action (match!1) (match!2)
     (match:_) -> Msg (match!1) (match!2) (match!3)
-
-----------------------------------------------------------------------
--- Graph generation
--- TODO: this could be expanded into standalone Text.Language.Graphviz
--- If only I could find a way to interveawe two State monads nicely
-data Param = Label String | Constraint Bool | Style Style 
-           | Shape Shape | ArrowHead String
-data Style = Invis | Dotted | Filled
-data Shape = Point | Plaintext
-
-addString = emit
-
-addNodeDefaults params = addNode "node" params
-
-addNode :: String -> [Param] -> Diagram ()
-addNode name params = emit $ unwords [name, mkParams params, ";"]
-
-addEdge from_node to_node params =
-  emit $ unwords $ 
-         [ from_node
-         , "->"
-         , to_node
-         , mkParams params
-         , ";"
-         ] 
-
--- Graph generation helpers
-mkParams [] = ""
-mkParams p  = "[" ++ concat (intersperse "," (map show p)) ++ "]"
-
-emit s = do
-  sec <- gets section
-  d <- gets diagram
-  setDiagram $ M.insertWith (++) sec [s] d
-
-inSection :: String -> Diagram a -> Diagram ()
-inSection name f = do
-  sec <- gets section
-  setSection name
-  f
-  setSection sec
-
-instance Show Param where
-  show (Label l) = "label=\""++l++"\""
-  show (Style s) =  "style="++show s
-  show (Constraint x) = "constraint=" ++ showB x
-    where
-      showB False = "false"
-      showB True = "true"
-  show (Shape x) = "shape=" ++ show x
-  show (ArrowHead x) = "arrowhead="++x
-
-instance Show Style where
-  show Invis = "invis"
-  show Dotted = "dotted"
-  show Filled = "filled"
-
-instance Show Shape where
-  show Point = "point"
-  show Plaintext = "plaintext"

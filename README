@@ -13,3 +13,6 @@ Latest version could be obtained via:
 
 License     :  BSD-style (see the file LICENSE)
 Send patches to dastapov@gmail.com (using "darcs send")
+
+Thanks to Cale, quicksilver and roconnor from #haskell for
+suggestions on how to modularize this.
