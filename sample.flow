@@ -1,0 +1,8 @@
+a -> b: catch a ball!
+b -> c: i'll pass it along
+c: what to do next?
+c -> a: lets throw it back again
+a: not fair!
+a -> c: find someone else!
+c -> d: ok, here you go
+d: zZzZzZzZzzz....
