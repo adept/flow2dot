@@ -22,6 +22,8 @@ import Text.Regex.Posix ((=~))
 import Data.Array (Array(),(!))
 import Text.UTF8 (fromUTF8, toUTF8)
 import Data.Maybe (fromJust)
+import Test.QuickCheck
+import Control.Monad (liftM, liftM2, liftM3)
 
 {-
 Idea: In order to draw sequence (flow) diagram using graphviz we can use directed layout (dot) to 
@@ -67,7 +69,8 @@ strict digraph SeqDiagram
 -- 3)Preformatted strings which are passed to output as-is
 data Flow = Msg String String String 
           | Action String String
-          | Pre String deriving Show
+          | Pre String
+            deriving (Eq,Show)
 
 main = do
   args <- getArgs
@@ -241,3 +244,46 @@ parseLine l  =
             []      -> Pre l
             (match:_) -> Action (match!1) (match!2)
     (match:_) -> Msg (match!1) (match!2) (match!3)
+
+-- Parser tests
+newtype Name = Name String
+newtype Message = Message String
+
+instance Arbitrary Name where
+  arbitrary = liftM Name (listOf' $ elements "abcxyz_")
+  coarbitrary = undefined
+
+instance Arbitrary Message where
+  -- words.unwords trick is needed to prevent Messages which contain only spaces
+  arbitrary = liftM ((Message).unwords.words) (listOf' $ elements "abcxyz_->; 123")
+  coarbitrary = undefined
+
+instance Arbitrary Flow where
+  arbitrary = frequency [ (10, liftM3 Msg mkName mkName mkMsg)
+                        , (5, liftM2 Action mkName mkMsg)
+                        , (2, liftM Pre mkMsg)
+                        ]
+    where
+      mkName = do Name n <- arbitrary; return n
+      mkMsg = do Message m <- arbitrary; return m
+  coarbitrary = undefined
+
+-- Taken from a unreleased version of quickcheck
+-- Just added ' to the names
+--   / Kolmodin
+listOf' :: Gen a -> Gen [a]
+listOf' gen = sized $ \n ->
+  do k <- choose (1,n)
+     vectorOf' k gen
+
+vectorOf' :: Int -> Gen a -> Gen [a]
+vectorOf' k gen = sequence [ gen | _ <- [1..k] ]
+
+
+showFlow (Msg f t m) = unwords [ f, " -> ", t, ": ", m ]
+showFlow (Action s a) = unwords [ s, ": ", a ]
+showFlow (Pre s) = s
+
+prop_reparse x =
+  let txt = map showFlow x
+      in x == map parseLine txt
