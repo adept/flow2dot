@@ -239,7 +239,7 @@ parseFlow fname = do
 
 parseLine "" = Pre ""
 parseLine l  =
-  case (l =~ "^\\s*(\\S*?)\\s*->\\s*(\\S*?):\\s*(.*?)\\s*$") :: [Array Int String] of
+  case (l =~ "^\\s*(\\S*?)\\s*->\\s*(\\S*?)\\s*:\\s*(.*?)\\s*$") :: [Array Int String] of
     [] -> case (l =~ "^\\s*(\\S*?)\\s*:\\s*(.*?)\\s*$") :: [Array Int String] of
             []      -> Pre l
             (match:_) -> Action (match!1) (match!2)
