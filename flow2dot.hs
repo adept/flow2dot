@@ -18,12 +18,12 @@ import System (getArgs)
 import Control.Monad.State (State,evalState,gets,modify)
 import qualified Data.Map as M
 import Data.List (intersperse,unfoldr,splitAt)
-import Text.Regex.Posix ((=~))
-import Data.Array (Array(),(!))
 import Text.UTF8 (fromUTF8, toUTF8)
 import Data.Maybe (fromJust)
+import Data.Char (isSpace)
 import Test.QuickCheck
 import Control.Monad (liftM, liftM2, liftM3)
+import Text.ParserCombinators.Parsec hiding (State)
 
 {-
 Idea: In order to draw sequence (flow) diagram using graphviz we can use directed layout (dot) to 
@@ -82,7 +82,7 @@ main = do
 -- | Process a .flow file and output generated .dot diagram
 process :: FilePath -> IO ()
 process fname = do
-  flow <- parseFlow fname
+  flow <- parseFlowFromFile fname
   putStrLn $ toUTF8 $ processFlow flow
 
 -- FIXME: remove "zzzz_BODY" and rework section generation to emit body last
@@ -233,29 +233,49 @@ incSwimline name = do
   setSwimline name (fromJust s+1)
 
 -- Parser
-parseFlow fname = do
+parseFlowFromFile fname = do
   raw <- readFile fname
-  return $ map parseLine $ lines $ fst $ fromUTF8 raw
+  return $ parseFlow fname $ fst $ fromUTF8 raw
 
-parseLine "" = Pre ""
-parseLine l  =
-  case (l =~ "^\\s*(\\S*?)\\s*->\\s*(\\S*?)\\s*:\\s*(.*?)\\s*$") :: [Array Int String] of
-    [] -> case (l =~ "^\\s*(\\S*?)\\s*:\\s*(.*?)\\s*$") :: [Array Int String] of
-            []      -> Pre l
-            (match:_) -> Action (match!1) (match!2)
-    (match:_) -> Msg (match!1) (match!2) (match!3)
+parseFlow :: String -> String -> [Flow]
+parseFlow _     ""  = []
+parseFlow fname str = 
+  case parse document fname str of
+       Left err   -> error $ unlines [ "Input:", str, "Error:", show err]
+       Right flow -> flow
+
+document = do
+  whitespace
+  fl <- many flowLine
+  eof
+  return fl
+
+flowLine = try parseMsg <|> try parseAction <|> parsePre
+parseMsg = do f <- identifier; string "->"; t <- identifier; string ":"; m <- anything
+              return $ Msg f t (trim m)
+parseAction = do s <- identifier; string ":"; a <- anything
+                 return $ Action s (trim a)
+parsePre = liftM Pre anything
+identifier = do whitespace; i <- many (alphaNum <|> oneOf "_"); whitespace
+                return i
+whitespace = many $ oneOf " \t"
+anything = try (anyChar `manyTill` newline) <|> many1 anyChar
+trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 
 -- Parser tests
 newtype Name = Name String
 newtype Message = Message String
 
 instance Arbitrary Name where
-  arbitrary = liftM Name (listOf' $ elements "abcxyz_")
+  arbitrary = liftM Name (listOf' $ elements "abcxyz_банк")
   coarbitrary = undefined
 
 instance Arbitrary Message where
   -- words.unwords trick is needed to prevent Messages which contain only spaces
-  arbitrary = liftM ((Message).unwords.words) (listOf' $ elements "abcxyz_->; 123")
+  arbitrary = liftM ((Message).unwords.words) $ frequency [ (50, listOf' $ elements "abcxyz_->; 123банк")
+                                                          -- One special case which i decided to hard-code
+                                                          , (1, return "foo -> bar")
+                                                          ]
   coarbitrary = undefined
 
 instance Arbitrary Flow where
@@ -280,10 +300,14 @@ vectorOf' :: Int -> Gen a -> Gen [a]
 vectorOf' k gen = sequence [ gen | _ <- [1..k] ]
 
 
-showFlow (Msg f t m) = unwords [ f, " -> ", t, ": ", m ]
-showFlow (Action s a) = unwords [ s, ": ", a ]
+showFlow (Msg f t m) = unwords [ f, " -> ", t, ":", m ]
+showFlow (Action s a) = unwords [ s, ":", a ]
 showFlow (Pre s) = s
 
 prop_reparse x =
-  let txt = map showFlow x
-      in x == map parseLine txt
+  let txt = unlines $ map showFlow x
+      in x == parseFlow "" txt
+
+prop_russian_k = 
+  ( parseFlow "a->b" "A->B: клиент" == [Msg "A" "B" "клиент"] ) && 
+  ( parseFlow "prod" "продавец -> клиент: подписание контракта, предоставление счета" == [Msg "продавец" "клиент" "подписание контракта, предоставление счета"] )
