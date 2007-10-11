@@ -6,7 +6,9 @@ a nice picture with help of Graphviz (www.graphviz.org)
 
 To try it out, run:
   runhaskell flow2dot.hs sample.flow | dot -T png -o sample.png
-and view "sample.png" with your favorite picture viewer.
+and view "sample.png" with your favorite picture viewer. If you
+dont get a nice picture and get something else (for example, ugly
+segfault from dot), try upgrading to latest Graphviz (2.12 or later)
 
 Latest version could be obtained via:
   darcs pull http://adept.linux.kiev.ua/repos/flow2dot/
