@@ -3,7 +3,7 @@
 -- |
 -- Name        :  Flow2Dot
 -- Copyright   :  (c) Dmitry Astapov, 2007
--- License     :  BSD-style (see the file libraries/base/LICENSE)
+-- License     :  BSD-style (see the file LICENSE)
 -- 
 -- Maintainer  :  Dmitry Astapov <dastapov@gmail.com>
 -- Stability   :  experimental

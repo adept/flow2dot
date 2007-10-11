@@ -7,7 +7,7 @@ Synopsis: Generates sequence diagrams from textual descriptions
 Homepage: http://adept.linux.kiev.ua/repos/flow2dot
 Category: Text
 Stability: Alpha
-Build-Depends: base, mtl >= 1.0, regex-posix, haskell98
+Build-Depends: base, mtl >= 1.0, regex-posix, haskell98, QuickCheck
 
 Executable: flow2dot
 Hs-Source-Dirs: .

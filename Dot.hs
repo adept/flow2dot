@@ -1,4 +1,16 @@
 {-# OPTIONS -fglasgow-exts #-}
+-----------------------------------------------------------------------------
+-- |
+-- Name        :  Dot
+-- Copyright   :  (c) Dmitry Astapov, 2007
+-- License     :  BSD-style (see the file LICENSE)
+-- 
+-- Maintainer  :  Dmitry Astapov <dastapov@gmail.com>
+-- Stability   :  experimental
+-- Portability :  portable
+--
+-- Library for generatin Graphviz (www.graphviz.org) documents
+-----------------------------------------------------------------------------
 module Dot ( inSection
            , addString
            , addNode
