@@ -12,10 +12,11 @@
 -----------------------------------------------------------------------------
 module Main where
 
-import Dot 
+import Dot
 
 import System (getArgs)
 import Control.Monad.State (State,evalState,gets,modify)
+import Control.Monad.State.Class
 import qualified Data.Map as M
 import Data.List (intersperse,unfoldr,splitAt)
 import Text.UTF8 (fromUTF8, toUTF8)
@@ -26,12 +27,12 @@ import Control.Monad (liftM, liftM2, liftM3)
 import Text.ParserCombinators.Parsec hiding (State)
 
 {-
-Idea: In order to draw sequence (flow) diagram using graphviz we can use directed layout (dot) to 
+Idea: In order to draw sequence (flow) diagram using graphviz we can use directed layout (dot) to
 generate "skeleton" of the diagram and draw message lines and action boxes over it in "constraint=false" mode,
 so that they would not disturb the "skeleton".
 
 Diagram could look like this:
-strict digraph SeqDiagram 
+strict digraph SeqDiagram
 {
   { // Those are swimline heads
     rank=same
@@ -58,7 +59,7 @@ strict digraph SeqDiagram
   tier1 -> tier2;
 
   // Actual messages. Note the "constraint=false"
-  actor1 -> system1[label="xxx", constraint=false]; 
+  actor1 -> system1[label="xxx", constraint=false];
   system2 -> actor2[label="yyy", constraint=false];
 }
 -}
@@ -67,11 +68,12 @@ strict digraph SeqDiagram
 -- 1)Messages: from ---(message)---> to
 -- 2)Actions: "system" performs "action"
 -- 3)Preformatted strings which are passed to output as-is
-data Flow = Msg String String String 
+data Flow = Msg String String String
           | Action String String
           | Pre String
             deriving (Eq,Show)
 
+main :: IO ()
 main = do
   args <- getArgs
   case args of
@@ -86,6 +88,7 @@ process fname = do
   putStrLn $ toUTF8 $ processFlow flow
 
 -- FIXME: remove "zzzz_BODY" and rework section generation to emit body last
+processFlow :: [Flow] -> String
 processFlow flow = evalState (flow2dot flow) (DiagS M.empty 1 (DotEnv "zzzz_BODY" M.empty))
 
 -- | State of the diagram builder
@@ -122,36 +125,39 @@ flow2dot flow = do
 flowElement2dot :: Flow -> Diagram ()
 -- Pass preformatted lines to output as-is
 flowElement2dot (Pre l) = addString l
--- Make a graph block where swimline nodes for the current tier will be put. 
+-- Make a graph block where swimline nodes for the current tier will be put.
 -- Populate tier with "tier anchor" node
 -- Generate nodes for message/action on all required swimlines
 -- Connect generated nodes, if necessary
 -- Connect tier to previous, which will ensure that tiers are ordered properly
 flowElement2dot (Action actor message) = do
-  tier <- getTierName
-  inSection tier $ do addString "rank=same;"
-                      addNode tier [Style Invis, Shape Point]
+  tir <- getTierName
+  inSection tir $ do addString "rank=same;"
+                     addNode tir [Style Invis, Shape Point]
   l <- mkLabel message
-  genNextNode tier actor [Style Filled, Shape Plaintext, Label l] 
+  genNextNode tir actor [Style Filled, Shape Plaintext, Label l]
   toNextTier
+
 flowElement2dot (Msg from to message) = do
-  tier <- getTierName
-  inSection tier $ do addString "rank=same;"
-                      addNode tier [Style Invis, Shape Point]
-  f <- genNextNode tier from [Style Invis, Shape Point]
-  t <- genNextNode tier to   [Style Invis, Shape Point]
+  tir <- getTierName
+  inSection tir $ do addString "rank=same;"
+                     addNode tir [Style Invis, Shape Point]
+  f <- genNextNode tir from [Style Invis, Shape Point]
+  t <- genNextNode tir to   [Style Invis, Shape Point]
   l <- mkLabel message
-  addEdge f t [ Label l 
+  addEdge f t [ Label l
               , Constraint False
               ]
   toNextTier
 
+mkLabel :: (Control.Monad.State.Class.MonadState DiagS m) => String -> m String
 mkLabel lbl = do
   t <- gets tier
   return $ show t ++ ": " ++ reflow lbl
   where
 
--- FIXME: for now, you have to hardcode desired width/height ratio
+
+reflow :: String -> String-- FIXME: for now, you have to hardcode desired width/height ratio
 reflow str = concat $ intersperse "\\n" $ map unwords $ splitInto words_in_row w
       where w = words str
             z = length w
@@ -164,17 +170,20 @@ reflow str = concat $ intersperse "\\n" $ map unwords $ splitInto words_in_row w
             width=3
             height=1
 
+-- toNextTier :: m ()
 toNextTier = do
-  tier <- getTierName
+  tir <- getTierName
   prev <- getPrevTierName
   case prev of
        Nothing -> return ()
-       Just p ->  addEdge p tier [ Style Invis ]
+       Just p ->  addEdge p tir [ Style Invis ]
   incTier
 
-
 -- Return the ID of the next node in the swimline `name',
+
 -- generating all required nodes and swimline connections along the way
+genNextNode :: (UsesDotEnv m, Control.Monad.State.Class.MonadState DiagS m) =>
+                                           String -> String -> [Param] -> m String
 genNextNode sec sline nodeparams = do
   s <- getSwimline sline
   case s of
@@ -198,68 +207,85 @@ genNextNode sec sline nodeparams = do
                        addEdge sline first [Style Dotted, ArrowHead "none"]
                        return first
 
+mkHeader :: String -> String
 mkHeader = map remove_underscore
   where
     remove_underscore '_' = ' '
     remove_underscore x   = x
 
 -- State access/modify helpers
+setTier :: (Control.Monad.State.Class.MonadState DiagS m) => Int -> m ()
 setTier x = modify (\f -> f {tier=x})
 
+-- getTierName :: m String
 getTierName = do
   t <- gets tier
   return $ "tier" ++ show t
 
+-- getPrevTierName :: m (Maybe String)
 getPrevTierName = do
   t <- gets tier
   if (t>1) then return $ Just $ "tier" ++ show (t-1)
            else return Nothing
 
+-- incTier :: m ()
 incTier = modify (\e -> e {tier = tier e +1} )
 
+getSwimline ::( Monad m1,Control.Monad.State.Class.MonadState DiagS m) =>
+             String -> m (m1 Int)
 getSwimline name = do
   s <- gets swimlines
   return $ M.lookup name s
 
+getSwimlineNodeName ::( Control.Monad.State.Class.MonadState DiagS m) => String -> m String
 getSwimlineNodeName name = do
   s <- getSwimline name
   return $ name ++ show (fromJust s)
 
-setSwimline name x = do 
+setSwimline :: (Control.Monad.State.Class.MonadState DiagS t) => String -> Int -> t ()
+setSwimline name x = do
   modify (\e -> e {swimlines = M.insert name x (swimlines e)})
 
+incSwimline :: (Control.Monad.State.Class.MonadState DiagS t) => String -> t ()
 incSwimline name = do
   s <- getSwimline name
   setSwimline name (fromJust s+1)
 
--- Parser
+
+parseFlowFromFile :: FilePath -> IO [Flow]-- Parser
 parseFlowFromFile fname = do
   raw <- readFile fname
   return $ parseFlow fname $ fst $ fromUTF8 raw
 
 parseFlow :: String -> String -> [Flow]
 parseFlow _     ""  = []
-parseFlow fname str = 
+parseFlow fname str =
   case parse document fname str of
        Left err   -> error $ unlines [ "Input:", str, "Error:", show err]
        Right flow -> flow
 
+document :: GenParser Char st [Flow]
 document = do
   whitespace
   fl <- many flowLine
   eof
   return fl
 
+flowLine, parseMsg, parseAction, parsePre :: GenParser Char st Flow
 flowLine = try parseMsg <|> try parseAction <|> parsePre
 parseMsg = do f <- identifier; string "->"; t <- identifier; string ":"; m <- anything
               return $ Msg f t (trim m)
 parseAction = do s <- identifier; string ":"; a <- anything
                  return $ Action s (trim a)
 parsePre = liftM Pre anything
+
+identifier, whitespace, anything :: GenParser Char st String
 identifier = do whitespace; i <- many (alphaNum <|> oneOf "_"); whitespace
                 return i
 whitespace = many $ oneOf " \t"
 anything = try (anyChar `manyTill` newline) <|> many1 anyChar
+
+trim :: String -> String
 trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 
 -- Parser tests
@@ -300,14 +326,17 @@ vectorOf' :: Int -> Gen a -> Gen [a]
 vectorOf' k gen = sequence [ gen | _ <- [1..k] ]
 
 
+showFlow :: Flow -> String
 showFlow (Msg f t m) = unwords [ f, " -> ", t, ":", m ]
 showFlow (Action s a) = unwords [ s, ":", a ]
 showFlow (Pre s) = s
 
+prop_reparse :: [Flow] -> Bool
 prop_reparse x =
   let txt = unlines $ map showFlow x
       in x == parseFlow "" txt
 
-prop_russian_k = 
-  ( parseFlow "a->b" "A->B: клиент" == [Msg "A" "B" "клиент"] ) && 
+prop_russian_k :: Bool
+prop_russian_k =
+  ( parseFlow "a->b" "A->B: клиент" == [Msg "A" "B" "клиент"] ) &&
   ( parseFlow "prod" "продавец -> клиент: подписание контракта, предоставление счета" == [Msg "продавец" "клиент" "подписание контракта, предоставление счета"] )
