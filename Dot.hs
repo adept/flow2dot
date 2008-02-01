@@ -1,10 +1,10 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Name        :  Dot
 -- Copyright   :  (c) Dmitry Astapov, 2007
 -- License     :  BSD-style (see the file LICENSE)
--- 
+--
 -- Maintainer  :  Dmitry Astapov <dastapov@gmail.com>
 -- Stability   :  experimental
 -- Portability :  portable

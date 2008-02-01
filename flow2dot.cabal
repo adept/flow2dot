@@ -17,10 +17,9 @@ Build-Depends:      base, mtl >= 1.0, containers, haskell98, QuickCheck, parsec
 Build-Type:         Simple
 Extra-Source-Files: README
 
-Executable: flow2dot
-Hs-Source-Dirs: . 
-Main-Is: flow2dot.hs
-GHC-Options: -fwarn-duplicate-exports -fwarn-incomplete-patterns
-             -fwarn-overlapping-patterns -fwarn-unused-imports
-             -fwarn-unused-binds
+Executable:    flow2dot
+Main-Is:       flow2dot.hs
 Other-Modules: Text.UTF8, Dot
+GHC-Options:   -Wall
+Extensions:    FlexibleInstances, FlexibleContexts
+
