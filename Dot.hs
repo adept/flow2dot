@@ -51,7 +51,7 @@ instance UsesDotEnv (State DotEnv) where
   setSection s   = modify (\e -> e {section = s})
 
 -- Dot language elements
-data Param = Label String | Constraint Bool | Style Style 
+data Param = Label String | Constraint Bool | Style Style
            | Shape Shape | ArrowHead String
 data Style = Invis | Dotted | Filled
 data Shape = Point | Plaintext
@@ -60,21 +60,21 @@ data Shape = Point | Plaintext
 addString :: UsesDotEnv m => String -> m ()
 addString = emit
 
-addNodeDefaults :: UsesDotEnv m => [Param] -> m ()
-addNodeDefaults params = addNode "node" params
+-- addNodeDefaults :: UsesDotEnv m => [Param] -> m ()
+-- addNodeDefaults params = addNode "node" params
 
 addNode :: UsesDotEnv m => String -> [Param] -> m ()
 addNode name params = emit $ unwords [name, mkParams params, ";"]
 
 addEdge :: UsesDotEnv m => String -> String -> [Param] -> m ()
 addEdge from_node to_node params =
-  emit $ unwords $ 
+  emit $ unwords $
          [ from_node
          , "->"
          , to_node
          , mkParams params
          , ";"
-         ] 
+         ]
 
 -- Graph generation helpers
 mkParams :: [Param] -> String
