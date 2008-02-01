@@ -58,7 +58,9 @@ import Data.Bits (Bits, shiftL, shiftR, (.&.), (.|.))
 
 import Data.List (unfoldr)
 
-toUTF8 s = (map (chr. fromIntegral) $ encode s)                                                                              
+toUTF8 :: String -> String
+toUTF8 s = (map (chr. fromIntegral) $ encode s)
+fromUTF8 :: String -> (String, [(Error, Int)])
 fromUTF8 s = decode (map (fromIntegral . ord) s)
 
 -- - UTF-8 in General -
@@ -121,7 +123,7 @@ encodeOne c
 
 -- With the above, a stream decoder is trivial:
 
-encode :: [Char] -> [Word8]
+encode :: String -> [Word8]
 encode = concatMap encodeOne
 
 
@@ -349,7 +351,7 @@ fourbyte_truncated n = (Left (Truncated n 4), n, [])
 -- The decoder examines all input, recording decoded characters as well as
 -- error-index pairs along the way.
 
-decode :: [Word8] -> ([Char], [(Error,Int)])
+decode :: [Word8] -> (String, [(Error,Int)])
 decode = swap . partitionEither . decodeEmbedErrors
 
 decodeEmbedErrors :: [Word8] -> [Either (Error,Int) Char]
@@ -371,4 +373,4 @@ partitionEither =
 
 toMaybe :: Bool -> a -> Maybe a
 toMaybe False _ = Nothing
-toMaybe True  x = Just x 
+toMaybe True  x = Just x
