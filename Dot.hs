@@ -60,9 +60,6 @@ data Shape = Point | Plaintext
 addString :: UsesDotEnv m => String -> m ()
 addString = emit
 
--- addNodeDefaults :: UsesDotEnv m => [Param] -> m ()
--- addNodeDefaults params = addNode "node" params
-
 addNode :: UsesDotEnv m => String -> [Param] -> m ()
 addNode name params = emit $ unwords [name, mkParams params, ";"]
 
