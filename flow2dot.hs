@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Name        :  Flow2Dot

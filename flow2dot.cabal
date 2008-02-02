@@ -21,5 +21,4 @@ Executable:    flow2dot
 Main-Is:       flow2dot.hs
 Other-Modules: Text.UTF8, Dot
 GHC-Options:   -Wall
-Extensions:    FlexibleInstances, FlexibleContexts
-
+Extensions:    FlexibleInstances
