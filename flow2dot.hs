@@ -16,7 +16,6 @@ import Dot
 
 import System (getArgs)
 import Control.Monad.State (State,evalState,gets,modify)
-import Control.Monad.State.Class
 import qualified Data.Map as M
 import Data.List (intersperse,unfoldr,splitAt)
 import Text.UTF8 (fromUTF8, toUTF8)
@@ -150,14 +149,15 @@ flowElement2dot (Msg from to message) = do
               ]
   toNextTier
 
-mkLabel :: (Control.Monad.State.Class.MonadState DiagS m) => String -> m String
+mkLabel :: String -> Diagram String
 mkLabel lbl = do
   t <- gets tier
   return $ show t ++ ": " ++ reflow lbl
   where
 
 
-reflow :: String -> String-- FIXME: for now, you have to hardcode desired width/height ratio
+reflow :: String -> String
+-- FIXME: for now, you have to hardcode desired width/height ratio
 reflow str = concat $ intersperse "\\n" $ map unwords $ splitInto words_in_row w
       where w = words str
             z = length w
@@ -170,7 +170,7 @@ reflow str = concat $ intersperse "\\n" $ map unwords $ splitInto words_in_row w
             width=3
             height=1
 
--- toNextTier :: m ()
+toNextTier :: Diagram ()
 toNextTier = do
   tir <- getTierName
   prev <- getPrevTierName
@@ -182,8 +182,7 @@ toNextTier = do
 -- Return the ID of the next node in the swimline `name',
 
 -- generating all required nodes and swimline connections along the way
-genNextNode :: (UsesDotEnv m, Control.Monad.State.Class.MonadState DiagS m) =>
-                                           String -> String -> [Param] -> m String
+genNextNode :: String -> String -> [Param] -> Diagram String
 genNextNode sec sline nodeparams = do
   s <- getSwimline sline
   case s of
@@ -214,39 +213,38 @@ mkHeader = map remove_underscore
     remove_underscore x   = x
 
 -- State access/modify helpers
-setTier :: (Control.Monad.State.Class.MonadState DiagS m) => Int -> m ()
+setTier :: Int -> Diagram ()
 setTier x = modify (\f -> f {tier=x})
 
--- getTierName :: m String
+getTierName :: Diagram String
 getTierName = do
   t <- gets tier
   return $ "tier" ++ show t
 
--- getPrevTierName :: m (Maybe String)
+getPrevTierName :: Diagram (Maybe String)
 getPrevTierName = do
   t <- gets tier
   if (t>1) then return $ Just $ "tier" ++ show (t-1)
            else return Nothing
 
--- incTier :: m ()
+incTier :: Diagram ()
 incTier = modify (\e -> e {tier = tier e +1} )
 
-getSwimline ::( Monad m1,Control.Monad.State.Class.MonadState DiagS m) =>
-             String -> m (m1 Int)
+getSwimline :: String -> Diagram (Maybe Int)
 getSwimline name = do
   s <- gets swimlines
   return $ M.lookup name s
 
-getSwimlineNodeName ::( Control.Monad.State.Class.MonadState DiagS m) => String -> m String
+getSwimlineNodeName :: String -> Diagram String
 getSwimlineNodeName name = do
   s <- getSwimline name
   return $ name ++ show (fromJust s)
 
-setSwimline :: (Control.Monad.State.Class.MonadState DiagS t) => String -> Int -> t ()
+setSwimline :: String -> Int -> Diagram ()
 setSwimline name x = do
   modify (\e -> e {swimlines = M.insert name x (swimlines e)})
 
-incSwimline :: (Control.Monad.State.Class.MonadState DiagS t) => String -> t ()
+incSwimline :: String -> Diagram ()
 incSwimline name = do
   s <- getSwimline name
   setSwimline name (fromJust s+1)
