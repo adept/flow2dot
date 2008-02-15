@@ -13,12 +13,12 @@ Category: Tool
 Stability: Works-for-me, passes tests, generates diagrams
 
 Tested-With:        GHC ==6.8.2
-Build-Depends:      base, mtl >= 1.0, containers, haskell98, QuickCheck, parsec
+Build-Depends:      base, mtl >= 1.0, containers, haskell98, QuickCheck, parsec, utf8-string
 Build-Type:         Simple
 Extra-Source-Files: README
 
 Executable:    flow2dot
 Main-Is:       flow2dot.hs
-Other-Modules: Text.UTF8, Dot
+Other-Modules: Dot
 GHC-Options:   -Wall
 Extensions:    FlexibleInstances

@@ -18,7 +18,8 @@ import System (getArgs)
 import Control.Monad.State (State,evalState,gets,modify)
 import qualified Data.Map as M
 import Data.List (intersperse,unfoldr,splitAt)
-import Text.UTF8 (fromUTF8, toUTF8)
+import Prelude hiding (putStrLn, readFile)
+import System.IO.UTF8 (putStrLn, readFile)
 import Data.Maybe (fromJust)
 import Data.Char (isSpace)
 import Test.QuickCheck
@@ -84,7 +85,7 @@ main = do
 process :: FilePath -> IO ()
 process fname = do
   flow <- parseFlowFromFile fname
-  putStrLn $ toUTF8 $ processFlow flow
+  putStrLn $ processFlow flow
 
 -- FIXME: remove "zzzz_BODY" and rework section generation to emit body last
 processFlow :: [Flow] -> String
@@ -253,7 +254,7 @@ incSwimline name = do
 parseFlowFromFile :: FilePath -> IO [Flow]-- Parser
 parseFlowFromFile fname = do
   raw <- readFile fname
-  return $ parseFlow fname $ fst $ fromUTF8 raw
+  return $ parseFlow fname raw
 
 parseFlow :: String -> String -> [Flow]
 parseFlow _     ""  = []
