@@ -93,7 +93,12 @@ inSection name f = do
 
 -- Prettyprinters
 instance Show Param where
-  show (Label l) = "label=\""++l++"\""
+  show (Label l) = "label=\""++quote l++"\""
+    where
+      quote "" = ""
+      quote s  = concatMap quote' s
+      quote' '"' = "\\\""
+      quote' x   = [x]
   show (Style s) =  "style="++show s
   show (Constraint x) = "constraint=" ++ showB x
     where
