@@ -1,10 +1,10 @@
 Name:    flow2dot
-Version: 0.5
+Version: 0.5.1
 License: BSD3
 License-File: LICENSE
 Author: Dmitry Astapov <dastapov@gmail.com>
 Maintainer: Dmitry Astapov <dastapov@gmail.com>
-Synopsis: Library and binary to generate sequence (flow) diagrams from textual descriptions
+Synopsis: Library and binary to generate sequence/flow diagrams from plain text source
 Description: Generates sequence diagrams from textual descriptions with help of Graphviz graph drawing tool.
              Check out <http://adept.linux.kiev.ua:8080/repos/flow2dot/sample.flow> (source)
              and <http://adept.linux.kiev.ua:8080/repos/flow2dot/sample.png> (output).
@@ -19,7 +19,6 @@ Extra-Source-Files: README
 
 Library
   Exposed-Modules: Text.FlowDiagram
-  Ghc-Options: -O2
   Build-Depends:      base, mtl >= 1.0, containers, haskell98, QuickCheck, parsec, utf8-string, dotgen >= 0.2
 
 Executable  flow2dot
