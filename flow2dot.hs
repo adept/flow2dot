@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Name        :  Flow2Dot
@@ -12,12 +11,11 @@
 -----------------------------------------------------------------------------
 module Main where
 
-import Dot
-
+import qualified Text.Dot as D
 import System (getArgs)
-import Control.Monad.State (State,evalState,gets,modify)
-import qualified Data.Map as M
-import Data.List (intersperse,unfoldr,splitAt)
+import Control.Monad.State (StateT, evalStateT, gets, modify, lift)
+import qualified Data.Map as M (Map, empty, lookup, insert)
+import Data.List (intersperse, unfoldr, splitAt)
 import Prelude hiding (putStrLn, readFile)
 import System.IO.UTF8 (putStrLn, readFile)
 import Data.Maybe (fromJust)
@@ -25,6 +23,7 @@ import Data.Char (isSpace)
 import Test.QuickCheck
 import Control.Monad (liftM, liftM2, liftM3)
 import Text.ParserCombinators.Parsec hiding (State)
+import Data.Char (chr)
 
 {-
 Idea: In order to draw sequence (flow) diagram using graphviz we can use directed layout (dot) to
@@ -67,10 +66,8 @@ strict digraph SeqDiagram
 -- | Flow consists of:
 -- 1)Messages: from ---(message)---> to
 -- 2)Actions: "system" performs "action"
--- 3)Preformatted strings which are passed to output as-is
 data Flow = Msg String String String
           | Action String String
-          | Pre String
             deriving (Eq,Show)
 
 main :: IO ()
@@ -87,79 +84,69 @@ process fname = do
   flow <- parseFlowFromFile fname
   putStrLn $ processFlow flow
 
--- FIXME: remove "zzzz_BODY" and rework section generation to emit body last
-processFlow :: [Flow] -> String
-processFlow flow = evalState (flow2dot flow) (DiagS M.empty 1 (DotEnv "zzzz_BODY" M.empty))
-
 -- | State of the diagram builder
-data DiagS = DiagS { swimlines::M.Map String Int
-                   -- ^ name, number of nodes
-                   , tier :: Int
+data DiagS = DiagS { swimlines::M.Map String D.NodeId
+                   -- ^ name of the swimline, ID of the last node on it
+                   , numTier :: Int
                    -- ^ number of the next diagram tier
-                   , dotEnv :: DotEnv
+                   , headings :: [D.NodeId]
+                   -- ^ IDs of all "swimline start" nodes
                    }
 
-type Diagram = State DiagS
+type Diagram = StateT DiagS D.Dot
 
-instance UsesDotEnv (State DiagS) where
-  getDotcument   = gets (dotcument . dotEnv)
-  setDotcument d = modify (\e -> let de = dotEnv e in e {dotEnv = de {dotcument = d}})
-  getSection     = gets (section . dotEnv)
-  setSection s   = modify (\e -> let de = dotEnv e in e {dotEnv = de {section = s}})
-
-
-flow2dot :: [Flow] -> Diagram String
-flow2dot flow = do
-  inSection "HEADING" $ addString "rank=same"
-  mapM_ flowElement2dot flow
-  d <- getDotcument
-  return $ header ++ (concatMap genSection $ M.toList d) ++ footer
-  where
+processFlow :: [Flow] -> String
+processFlow flow = 
+  ("strict "++) $ D.showDot $ evalStateT (flow2dot flow) (DiagS M.empty 1 [])
     -- NB: "strict" is VERY important here
     -- Without it, "dot" segfaults while rendering diagram (dot 2.12)
-    header = "strict digraph Seq {\n"
-    footer = "}\n"
-    genSection ("zzzz_BODY",contents) = unlines (reverse contents)
-    genSection (name,contents) = "{ //" ++ name ++ "\n" ++ unlines (reverse contents) ++ "}\n"
+
+flow2dot :: [Flow] -> Diagram ()
+flow2dot flow = do
+  mapM_ flowElement2dot flow
+  hs <- gets headings
+  same hs
 
 flowElement2dot :: Flow -> Diagram ()
--- Pass preformatted lines to output as-is
-flowElement2dot (Pre l) = addString l
 -- Make a graph block where swimline nodes for the current tier will be put.
 -- Populate tier with "tier anchor" node
 -- Generate nodes for message/action on all required swimlines
 -- Connect generated nodes, if necessary
 -- Connect tier to previous, which will ensure that tiers are ordered properly
 flowElement2dot (Action actor message) = do
-  tir <- getTierName
-  inSection tir $ do addString "rank=same;"
-                     addNode tir [Style Invis, Shape Point]
+  tier <- invisNode
   l <- mkLabel message
-  genNextNode tir actor [Style Filled, Shape Plaintext, Label l]
-  toNextTier
+  a <- node [("style","filled"),("shape","plaintext"),("label",l)]
+  same [tier,a]
+  connectToPrev actor a
+  connectToPrev "___tier" tier
+  incTier
 
 flowElement2dot (Msg from to message) = do
-  tir <- getTierName
-  inSection tir $ do addString "rank=same;"
-                     addNode tir [Style Invis, Shape Point]
-  f <- genNextNode tir from [Style Invis, Shape Point]
-  t <- genNextNode tir to   [Style Invis, Shape Point]
+  tier <- invisNode
+  f    <- invisNode
+  t    <- invisNode
+  same [f,t,tier]
+
   l <- mkLabel message
-  addEdge f t [ Label l
-              , Constraint False
-              ]
-  toNextTier
+
+  connectToPrev from f
+  connectToPrev to t
+  connectToPrev "___tier" tier
+  edge f t [("label",l) {-,("constraint","false")-} ] -- This is not needed with recent graphviz
+  incTier
 
 mkLabel :: String -> Diagram String
 mkLabel lbl = do
-  t <- gets tier
+  t <- gets numTier
   return $ show t ++ ": " ++ reflow lbl
-  where
 
+invisNode :: Diagram D.NodeId
+invisNode = node [("style","invis"),("shape","point")]
 
 reflow :: String -> String
 -- FIXME: for now, you have to hardcode desired width/height ratio
-reflow str = concat $ intersperse "\\n" $ map unwords $ splitInto words_in_row w
+reflow str = concat $ intersperse [chr 10] $ map unwords $ splitInto words_in_row w
       where w = words str
             z = length w
             rows = z*height `div` (height+width)
@@ -171,41 +158,25 @@ reflow str = concat $ intersperse "\\n" $ map unwords $ splitInto words_in_row w
             width=3
             height=1
 
-toNextTier :: Diagram ()
-toNextTier = do
-  tir <- getTierName
-  prev <- getPrevTierName
-  case prev of
-       Nothing -> return ()
-       Just p ->  addEdge p tir [ Style Invis ]
-  incTier
-
 -- Return the ID of the next node in the swimline `name',
-
 -- generating all required nodes and swimline connections along the way
-genNextNode :: String -> String -> [Param] -> Diagram String
-genNextNode sec sline nodeparams = do
+connectToPrev :: String -> D.NodeId -> Diagram ()
+connectToPrev "___tier" _ = return ()
+connectToPrev sline currNode = do
   s <- getSwimline sline
   case s of
        -- Swimline already exists
-       (Just _) ->  do prev <- getSwimlineNodeName sline
-                       incSwimline sline
-                       next <- getSwimlineNodeName sline
-                       -- Add new swimline node
-                       inSection sec $ addNode next nodeparams
-                       -- Connect it to the rest of swimline
-                       addEdge prev next [Style Dotted, ArrowHead "none"]
-                       return next
+       (Just prevNode) ->  do edge prevNode currNode [("style","dotted"),("arrowhead","none")]
+                              setSwimline sline currNode
        -- Otherwise, swimline hase to be created
-       (Nothing) -> do setSwimline sline 1
-                       -- Add heading
-                       inSection "HEADING" $ addNode sline [Label (mkHeader sline)]
-                       -- Add first node
-                       first <- getSwimlineNodeName sline
-                       inSection sec $ addNode first nodeparams
-                       -- Connect it to the start of swimline
-                       addEdge sline first [Style Dotted, ArrowHead "none"]
-                       return first
+       (Nothing) -> do setSwimline sline currNode
+                       -- Add heading node
+                       -- TODO: inSection "HEADING" $ addNode sline [Label (mkHeader sline)]
+                       heading <- node [("label", mkHeader sline)]
+                       addHeading heading
+                       setSwimline sline heading
+                       -- Retry connecting
+                       connectToPrev sline currNode
 
 mkHeader :: String -> String
 mkHeader = map remove_underscore
@@ -213,45 +184,37 @@ mkHeader = map remove_underscore
     remove_underscore '_' = ' '
     remove_underscore x   = x
 
+------------------------------
 -- State access/modify helpers
-setTier :: Int -> Diagram ()
-setTier x = modify (\f -> f {tier=x})
-
-getTierName :: Diagram String
-getTierName = do
-  t <- gets tier
-  return $ "tier" ++ show t
-
-getPrevTierName :: Diagram (Maybe String)
-getPrevTierName = do
-  t <- gets tier
-  if (t>1) then return $ Just $ "tier" ++ show (t-1)
-           else return Nothing
+------------------------------
 
 incTier :: Diagram ()
-incTier = modify (\e -> e {tier = tier e +1} )
+incTier = modify (\e -> e {numTier = numTier e +1} )
 
-getSwimline :: String -> Diagram (Maybe Int)
+getSwimline :: String -> Diagram (Maybe D.NodeId)
 getSwimline name = do
   s <- gets swimlines
   return $ M.lookup name s
 
-getSwimlineNodeName :: String -> Diagram String
-getSwimlineNodeName name = do
-  s <- getSwimline name
-  return $ name ++ show (fromJust s)
-
-setSwimline :: String -> Int -> Diagram ()
+setSwimline :: String -> D.NodeId -> Diagram ()
 setSwimline name x = do
   modify (\e -> e {swimlines = M.insert name x (swimlines e)})
 
-incSwimline :: String -> Diagram ()
-incSwimline name = do
-  s <- getSwimline name
-  setSwimline name (fromJust s+1)
+addHeading :: D.NodeId -> Diagram ()
+addHeading x = do
+  modify (\e -> e {headings = x:(headings e)})
 
+------------------------------------------------
+-- Lifting Text.Dot functions to the State monad
+------------------------------------------------
+same = lift . D.same
+node = lift . D.node
+edge f t args = lift $ D.edge f t args
 
-parseFlowFromFile :: FilePath -> IO [Flow]-- Parser
+---------
+-- Parser
+---------
+parseFlowFromFile :: FilePath -> IO [Flow]
 parseFlowFromFile fname = do
   raw <- readFile fname
   return $ parseFlow fname raw
@@ -270,13 +233,12 @@ document = do
   eof
   return fl
 
-flowLine, parseMsg, parseAction, parsePre :: GenParser Char st Flow
-flowLine = try parseMsg <|> try parseAction <|> parsePre
+flowLine, parseMsg, parseAction :: GenParser Char st Flow
+flowLine = try parseMsg <|> try parseAction
 parseMsg = do f <- identifier; string "->"; t <- identifier; string ":"; m <- anything
               return $ Msg f t (trim m)
 parseAction = do s <- identifier; string ":"; a <- anything
                  return $ Action s (trim a)
-parsePre = liftM Pre anything
 
 identifier, whitespace, anything :: GenParser Char st String
 identifier = do whitespace; i <- many (alphaNum <|> oneOf "_"); whitespace
@@ -306,7 +268,6 @@ instance Arbitrary Message where
 instance Arbitrary Flow where
   arbitrary = frequency [ (10, liftM3 Msg mkName mkName mkMsg)
                         , (5, liftM2 Action mkName mkMsg)
-                        , (2, liftM Pre mkMsg)
                         ]
     where
       mkName = do Name n <- arbitrary; return n
@@ -328,7 +289,6 @@ vectorOf' k gen = sequence [ gen | _ <- [1..k] ]
 showFlow :: Flow -> String
 showFlow (Msg f t m) = unwords [ f, " -> ", t, ":", m ]
 showFlow (Action s a) = unwords [ s, ":", a ]
-showFlow (Pre s) = s
 
 prop_reparse :: [Flow] -> Bool
 prop_reparse x =
