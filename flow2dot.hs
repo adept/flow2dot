@@ -1,11 +1,11 @@
 -----------------------------------------------------------------------------
 -- |
 -- Name        :  Flow2Dot
--- Copyright   :  (c) Dmitry Astapov, 2007
+-- Copyright   :  (c) Dmitry Astapov, 2007-2009
 -- License     :  BSD-style (see the file LICENSE)
 --
 -- Maintainer  :  Dmitry Astapov <dastapov@gmail.com>
--- Stability   :  experimental
+-- Stability   :  beta
 -- Portability :  portable
 --
 -----------------------------------------------------------------------------
@@ -18,7 +18,6 @@ import qualified Data.Map as M (Map, empty, lookup, insert)
 import Data.List (intersperse, unfoldr, splitAt)
 import Prelude hiding (putStrLn, readFile)
 import System.IO.UTF8 (putStrLn, readFile)
-import Data.Maybe (fromJust)
 import Data.Char (isSpace)
 import Test.QuickCheck
 import Control.Monad (liftM, liftM2, liftM3)
@@ -27,8 +26,7 @@ import Data.Char (chr)
 
 {-
 Idea: In order to draw sequence (flow) diagram using graphviz we can use directed layout (dot) to
-generate "skeleton" of the diagram and draw message lines and action boxes over it in "constraint=false" mode,
-so that they would not disturb the "skeleton".
+generate "skeleton" of the diagram and draw message lines and action boxes
 
 Diagram could look like this:
 strict digraph SeqDiagram
