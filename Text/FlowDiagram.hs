@@ -115,7 +115,7 @@ flowElement2dot (Msg from to message) = do
   connectToPrev from f
   connectToPrev to t
   connectToPrev "___tier" tier
-  edge f t [("label",l) {-,("constraint","false")-} ] -- This is not needed with recent graphviz
+  edge f t [("label",l) ,("constraint","false") ]
   incTier
 
 mkLabel :: String -> Diagram String
