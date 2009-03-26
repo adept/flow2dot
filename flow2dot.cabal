@@ -15,7 +15,7 @@ Cabal-Version:   >= 1.2
 
 Tested-With:        GHC >=6.8.2
 Build-Type:         Simple
-Extra-Source-Files: README
+Extra-Source-Files: README flow2dot-fix-dot-lost-edges
 
 Library
   Exposed-Modules: Text.FlowDiagram

@@ -1,0 +1,16 @@
+#!/bin/bash
+# Fix generated diagram for dot 2.20.x to remove complains about "Lost edges"
+input=$(mktemp)
+log=$(mktemp)
+cat > $input
+dot "$@" < $input 2> $log
+[ -s $log ] && (
+    sedpgm=$(mktemp)
+    while read foo foo f t foo ; do
+      echo "/$f -> $t/s/,constraint=\"false\"//;" >> $sedpgm
+    done < $log
+    sed -f $sedpgm < $input | dot "$@"
+    rm $log 
+    rm $sedpgm
+)
+rm $input
