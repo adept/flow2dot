@@ -128,7 +128,8 @@ invisNode = node [("style","invis"),("shape","point")]
 
 reflow :: String -> String
 -- FIXME: for now, you have to hardcode desired width/height ratio
-reflow str = concat $ intersperse [chr 10] $ map unwords $ splitInto words_in_row w
+-- FIXME: (tail $ init $ show) trick is needed to work around dotgen-0.2 limitations
+reflow str = tail $ init $ show $ concat $ intersperse [chr 10] $ map unwords $ splitInto words_in_row w
       where w = words str
             z = length w
             rows = z*height `div` (height+width)

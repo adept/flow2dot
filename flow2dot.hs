@@ -12,6 +12,8 @@
 module Main where
 
 import Text.FlowDiagram
+import System.IO.UTF8 (putStrLn)
+import Prelude hiding (putStrLn)
 import System (getArgs)
 
 main :: IO ()
