@@ -1,5 +1,5 @@
 Name:    flow2dot
-Version: 0.6
+Version: 0.6.1
 License: BSD3
 License-File: LICENSE
 Author: Dmitry Astapov <dastapov@gmail.com>
@@ -19,6 +19,7 @@ Extra-Source-Files: README flow2dot-fix-dot-lost-edges
 
 Library
   Exposed-Modules: Text.FlowDiagram
+  Other-Modules: Text.Dot
   Build-Depends:      base, mtl >= 1.0, containers, haskell98, QuickCheck, parsec, utf8-string
 
 Executable  flow2dot
