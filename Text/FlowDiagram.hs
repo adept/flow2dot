@@ -172,7 +172,6 @@ connectToPrev sline currNode = do
        -- Otherwise, swimline hase to be created
        (Nothing) -> do setSwimline sline currNode
                        -- Add heading node
-                       -- TODO: inSection "HEADING" $ addNode sline [Label (mkHeader sline)]
                        heading <- node [("label", mkHeader sline)]
                        addHeading heading
                        setSwimline sline heading
