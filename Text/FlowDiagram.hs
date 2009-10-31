@@ -19,7 +19,6 @@ import Data.Char (isSpace)
 import Test.QuickCheck
 import Control.Monad (liftM, liftM2, liftM3)
 import Text.ParserCombinators.Parsec hiding (State)
-import Data.Char (chr)
 
 {-
 Idea: In order to draw sequence (flow) diagram using graphviz we can use directed layout (dot) to
