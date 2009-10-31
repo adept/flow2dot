@@ -12,7 +12,7 @@ module Text.FlowDiagram ( flow2dot
 import qualified Text.Dot as D
 import Control.Monad.State (StateT, evalStateT, gets, modify, lift)
 import qualified Data.Map as M (Map, empty, lookup, insert)
-import Data.List (intercalate, unfoldr, splitAt)
+import Data.List (intercalate, unfoldr, splitAt, findIndex)
 import Prelude hiding (readFile)
 import System.IO.UTF8 (readFile)
 import Data.Char (isSpace)
@@ -61,7 +61,9 @@ strict digraph SeqDiagram
 data Flow = Msg String String String
           -- ^ Message (from, to, message text). Syntax in the source file: @from -> to: message text@
           | Action String String
-            -- ^ Action (actor, message text). Syntax in the source file: @actor: message text@
+          -- ^ Action (actor, message text). Syntax in the source file: @actor: message text@
+          | Order [String]
+          -- ^ Tries to put swimlines in the specified order. Syntax: @order swimline1 swimline2 ...@
             deriving (Eq,Show)
 
 -- | State of the diagram builder
@@ -84,17 +86,21 @@ flow2dot flow =
 
 flow2dot' :: [Flow] -> Diagram ()
 flow2dot' flow = do
-  mapM_ flowElement2dot flow
+  let order = case [ ns | Order ns <- flow ] of
+                []     -> Nothing
+                -- Only the first Order directive would be taken into account
+                (ns:_) -> Just ns
+  mapM_ (flowElement2dot order) flow
   hs <- gets headings
   same hs
 
-flowElement2dot :: Flow -> Diagram ()
+flowElement2dot :: Maybe [String] -> Flow -> Diagram ()
 -- Make a graph block where swimline nodes for the current tier will be put.
 -- Populate tier with "tier anchor" node
 -- Generate nodes for message/action on all required swimlines
 -- Connect generated nodes, if necessary
 -- Connect tier to previous, which will ensure that tiers are ordered properly
-flowElement2dot (Action actor message) = do
+flowElement2dot _ (Action actor message) = do
   tier <- invisNode
   l <- mkLabel message
   a <- node [("style","filled"),("shape","plaintext"),("label",l)]
@@ -103,7 +109,7 @@ flowElement2dot (Action actor message) = do
   connectToPrev "___tier" tier
   incTier
 
-flowElement2dot (Msg from to message) = do
+flowElement2dot order (Msg from to message) = do
   tier <- invisNode
   f    <- invisNode
   t    <- invisNode
@@ -114,8 +120,21 @@ flowElement2dot (Msg from to message) = do
   connectToPrev from f
   connectToPrev to t
   connectToPrev "___tier" tier
-  edge f t [("label",l) ,("constraint","false") ]
+  let (f',t',attrs) = 
+        if order == Nothing
+           then (f,t,[])
+           else let (Just sls) = order
+                    in case (findIndex (==from) sls, findIndex (==to) sls) of
+                         (Just x, Just y) -> if x>y then (t,f,[("dir","back")]) else (f,t,[])
+                         _                -> (f,t,[])
+
+  edge f' t' $ [("label",l)] ++ attrs
   incTier
+    
+-- Order setting is done in Msg processing
+flowElement2dot _ (Order _) = return ()
+
+
 
 mkLabel :: String -> Diagram String
 mkLabel lbl = do
@@ -220,7 +239,10 @@ document = do
   return fl
 
 flowLine, parseMsg, parseAction :: GenParser Char st Flow
-flowLine = try parseMsg <|> try parseAction
+flowLine = try parseOrder <|> try parseMsg <|> try parseAction
+parseOrder = do string "order"
+                is <- identifier `manyTill` newline
+                return $ Order is
 parseMsg = do f <- identifier; string "->"; t <- identifier; string ":"; m <- anything
               return $ Msg f t (trim m)
 parseAction = do s <- identifier; string ":"; a <- anything
@@ -274,7 +296,8 @@ vectorOf' k gen = sequence [ gen | _ <- [1..k] ]
 
 -- | Print element of the flow diagram as String
 showFlow :: Flow -> String
-showFlow (Msg f t m) = unwords [ f, " -> ", t, ":", m ]
+showFlow (Order sl)   = "order " ++ intercalate " " sl
+showFlow (Msg f t m)  = unwords [ f, " -> ", t, ":", m ]
 showFlow (Action s a) = unwords [ s, ":", a ]
 
 prop_reparse :: [Flow] -> Bool
