@@ -20,7 +20,7 @@ Extra-Source-Files: README ChangeLog
 Library
   Exposed-Modules: Text.FlowDiagram
   Other-Modules:   Text.Dot
-  Build-Depends:   base, mtl >= 1.0, containers, haskell98, QuickCheck, parsec, utf8-string
+  Build-Depends:   base >=3 && <4, mtl >= 1.0, containers, haskell98, QuickCheck, parsec, utf8-string
 
 Executable  flow2dot
   Main-Is:       flow2dot.hs
