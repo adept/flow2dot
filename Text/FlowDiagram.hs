@@ -241,6 +241,7 @@ newtype Message = Message String
 
 instance Arbitrary Name where
   arbitrary = liftM Name (listOf' $ elements "abcxyz_банк")
+  coarbitrary = undefined
 
 instance Arbitrary Message where
   -- words.unwords trick is needed to prevent Messages which contain only spaces
@@ -248,6 +249,7 @@ instance Arbitrary Message where
                                                           -- One special case which i decided to hard-code
                                                           , (1, return "foo -> bar")
                                                           ]
+  coarbitrary = undefined
 
 instance Arbitrary Flow where
   arbitrary = frequency [ (10, liftM3 Msg mkName mkName mkMsg)
@@ -256,6 +258,7 @@ instance Arbitrary Flow where
     where
       mkName = do Name n <- arbitrary; return n
       mkMsg = do Message m <- arbitrary; return m
+  coarbitrary = undefined
 
 -- Taken from a unreleased version of quickcheck
 -- Just added ' to the names
