@@ -12,7 +12,7 @@ module Text.FlowDiagram ( flow2dot
 import qualified Text.Dot as D
 import Control.Monad.State (StateT, evalStateT, gets, modify, lift)
 import qualified Data.Map as M (Map, empty, lookup, insert)
-import Data.List (intersperse, unfoldr, splitAt)
+import Data.List (intercalate, unfoldr, splitAt)
 import Prelude hiding (readFile)
 import System.IO.UTF8 (readFile)
 import Data.Char (isSpace)
@@ -129,7 +129,7 @@ invisNode = node [("style","invis"),("shape","point")]
 reflow :: String -> String
 -- FIXME: for now, you have to hardcode desired width/height ratio
 -- FIXME: (tail $ init $ show) trick is needed to work around dotgen-0.2 limitations
-reflow str = tail $ init $ show $ concat $ intersperse [chr 10] $ map unwords $ splitInto words_in_row w
+reflow str = intercalate "\n" $ map unwords $ splitInto words_in_row w
       where w = words str
             z = length w
             rows = z*height `div` (height+width)
