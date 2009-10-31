@@ -144,7 +144,8 @@ showAttr (name,val) = name ++ "=\""   ++ foldr showsDotChar "" val ++ "\""
 
 showsDotChar '"'  = ("\\\"" ++)
 showsDotChar '\\' = ("\\\\" ++)
-showsDotChar x    = showLitChar x
+showsDotChar x    | ord x < 32 = showLitChar x
+                  | otherwise  = ([x]++)
 
 
 -- | 'netlistGraph' generates a simple graph from a netlist.
