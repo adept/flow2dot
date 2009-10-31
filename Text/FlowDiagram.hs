@@ -227,7 +227,7 @@ parseAction = do s <- identifier; string ":"; a <- anything
                  return $ Action s (trim a)
 
 identifier, whitespace, anything :: GenParser Char st String
-identifier = do whitespace; i <- many (alphaNum <|> oneOf "_"); whitespace
+identifier = do whitespace; i <- many1 (alphaNum <|> oneOf "_"); whitespace
                 return i
 whitespace = many $ oneOf " \t"
 anything = try (anyChar `manyTill` newline) <|> many1 anyChar
