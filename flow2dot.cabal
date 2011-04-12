@@ -11,7 +11,7 @@ Description: Generates sequence diagrams from textual descriptions with help of 
 Homepage: http://adept.linux.kiev.ua:8080/repos/flow2dot
 Category: Tool
 Stability: beta
-Cabal-Version:   >= 1.2
+Cabal-Version:   >= 1.6
 
 Tested-With:        GHC >=6.10.4
 Build-Type:         Simple
@@ -34,3 +34,7 @@ Executable  flow2dot
                    Text.FlowDiagram
   if impl(ghc >= 7.0)
     cpp-options: -DNATIVEUTF8
+
+source-repository head
+  type:     darcs
+  location: adept@patch-tag.com:/r/adept/flow2dot
