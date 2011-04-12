@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-|
 Converts flow diagrams to the Graphviz (Dot) files for subsequent rendering
 into nice pictures.
@@ -13,8 +14,10 @@ import qualified Text.Dot as D
 import Control.Monad.State (StateT, evalStateT, gets, modify, lift)
 import qualified Data.Map as M (Map, empty, lookup, insert)
 import Data.List (intercalate, unfoldr, splitAt, findIndex)
+#ifndef NATIVEUTF8
 import Prelude hiding (readFile)
 import System.IO.UTF8 (readFile)
+#endif
 import Data.Char (isSpace)
 import Test.QuickCheck
 import Control.Monad (liftM, liftM2, liftM3)

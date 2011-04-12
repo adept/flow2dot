@@ -1,5 +1,5 @@
 Name:    flow2dot
-Version: 0.7
+Version: 0.8
 License: BSD3
 License-File: LICENSE
 Author: Dmitry Astapov <dastapov@gmail.com>
@@ -18,9 +18,19 @@ Build-Type:         Simple
 Extra-Source-Files: README ChangeLog
 
 Library
+  hs-source-dirs: .
+  Extensions: CPP
   Exposed-Modules: Text.FlowDiagram
   Other-Modules:   Text.Dot
-  Build-Depends:   base >=3 && <4, mtl >= 1.0, containers, haskell98, QuickCheck, parsec, utf8-string
+  Build-Depends:   base >=3 && <=5, mtl >= 1.0, containers, haskell98, QuickCheck, parsec, utf8-string
+  if impl(ghc >= 7.0)
+    cpp-options: -DNATIVEUTF8
 
 Executable  flow2dot
+  hs-source-dirs: .
   Main-Is:       flow2dot.hs
+  Extensions: CPP
+  Other-Modules:   Text.Dot
+                   Text.FlowDiagram
+  if impl(ghc >= 7.0)
+    cpp-options: -DNATIVEUTF8

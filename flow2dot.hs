@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Name        :  Flow2Dot
@@ -12,8 +13,10 @@
 module Main where
 
 import Text.FlowDiagram
+#ifndef NATIVEUTF8
 import System.IO.UTF8 (putStrLn)
 import Prelude hiding (putStrLn)
+#endif
 import System (getArgs)
 
 main :: IO ()
