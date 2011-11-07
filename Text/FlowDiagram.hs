@@ -142,7 +142,8 @@ flowElement2dot _ (Order _) = return ()
 mkLabel :: String -> Diagram String
 mkLabel lbl = do
   t <- gets numTier
-  return $ show t ++ ": " ++ reflow lbl
+  return $ if null lbl then show t
+                       else (show t ++ ": " ++ reflow lbl)
 
 invisNode :: Diagram D.NodeId
 invisNode = node [("style","invis"),("shape","point")]
@@ -245,10 +246,15 @@ flowLine = try parseOrder <|> try parseMsg <|> try parseAction
 parseOrder = do string "order"
                 is <- identifier `manyTill` newline
                 return $ Order is
-parseMsg = do f <- identifier; string "->"; t <- identifier; string ":"; m <- anything
+parseMsg = do f <- identifier; string "->"; t <- identifier; m <- optionalMessage
               return $ Msg f t (trim m)
 parseAction = do s <- identifier; string ":"; a <- anything
                  return $ Action s (trim a)
+
+optionalMessage = do
+  m <- option "" (try (do {string ":"; anything}))
+  optional newline
+  return m
 
 identifier, whitespace, anything :: GenParser Char st String
 identifier = do whitespace; i <- many1 (alphaNum <|> oneOf "_"); whitespace
