@@ -2,8 +2,8 @@ order a b c d
 a -> b: let's play "catch a ball"!
 b -> c: i'll pass it along
 c: what to do next?
-c -> a: lets throw it back again
-a: "not fair!"
-a -> c: find someone else!
+c -> a
+a: "hello d!"
+a -> c: d wants to play too!
 c -> d: ok, here you go: catch!
-d: zZzZzZzZzzz....
+d: oops..
