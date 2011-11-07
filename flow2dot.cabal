@@ -15,7 +15,7 @@ Cabal-Version:   >= 1.6
 
 Tested-With:        GHC >=6.10.4
 Build-Type:         Simple
-Extra-Source-Files: README ChangeLog
+Extra-Source-Files: README ChangeLog sample.flow
 
 Library
   hs-source-dirs: .
