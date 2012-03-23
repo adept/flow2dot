@@ -17,7 +17,7 @@ import Text.FlowDiagram
 import System.IO.UTF8 (putStrLn)
 import Prelude hiding (putStrLn)
 #endif
-import System (getArgs)
+import System.Environment (getArgs)
 
 main :: IO ()
 main = do
