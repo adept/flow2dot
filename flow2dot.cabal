@@ -22,9 +22,11 @@ Library
   Extensions: CPP
   Exposed-Modules: Text.FlowDiagram
   Other-Modules:   Text.Dot
-  Build-Depends:   base >=3 && <=5, mtl >= 1.0, containers, haskell98, QuickCheck, parsec, utf8-string
+  Build-Depends:   base >=3 && <=5, mtl >= 1.0, containers, QuickCheck, parsec, utf8-string
   if impl(ghc >= 7.0)
     cpp-options: -DNATIVEUTF8
+  if impl(ghc < 7.2.1)
+    Build-Depends: haskell98
 
 Executable  flow2dot
   hs-source-dirs: .
