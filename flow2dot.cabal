@@ -39,4 +39,4 @@ Executable  flow2dot
 
 source-repository head
   type:     darcs
-  location: adept@patch-tag.com:/r/adept/flow2dot
+  location: http://patch-tag.com/r/adept/flow2dot
