@@ -18,6 +18,7 @@ import Data.List (intercalate, unfoldr, splitAt, findIndex)
 import Prelude hiding (readFile)
 import System.IO.UTF8 (readFile)
 #endif
+import Data.Maybe (catMaybes)
 import Data.Char (isSpace)
 import Test.QuickCheck
 import Control.Monad (liftM, liftM2, liftM3)
@@ -239,17 +240,18 @@ document = do
   whitespace
   fl <- many flowLine
   eof
-  return fl
+  return $ catMaybes fl
 
-flowLine, parseMsg, parseAction :: GenParser Char st Flow
-flowLine = try parseOrder <|> try parseMsg <|> try parseAction
+flowLine, parseMsg, parseAction :: GenParser Char st (Maybe Flow)
+flowLine = try parseOrder <|> try parseMsg <|> try parseAction <|> parseBlank
 parseOrder = do string "order"
                 is <- identifier `manyTill` newline
-                return $ Order is
+                return $ Just $ Order is
 parseMsg = do f <- identifier; string "->"; t <- identifier; m <- optionalMessage
-              return $ Msg f t (trim m)
+              return $ Just $ Msg f t (trim m)
 parseAction = do s <- identifier; string ":"; a <- anything
-                 return $ Action s (trim a)
+                 return $ Just $ Action s (trim a)
+parseBlank = do whitespace; newline; return Nothing
 
 optionalMessage = do
   m <- option "" (try (do {string ":"; anything}))
