@@ -243,7 +243,7 @@ document = do
   return $ catMaybes fl
 
 flowLine, parseMsg, parseAction :: GenParser Char st (Maybe Flow)
-flowLine = try parseOrder <|> try parseMsg <|> try parseAction <|> parseBlank
+flowLine = try parseOrder <|> try parseMsg <|> try parseAction <|> parseComment <|> parseBlank
 parseOrder = do string "order"
                 is <- identifier `manyTill` newline
                 return $ Just $ Order is
@@ -252,6 +252,7 @@ parseMsg = do f <- identifier; string "->"; t <- identifier; m <- optionalMessag
 parseAction = do s <- identifier; string ":"; a <- anything
                  return $ Just $ Action s (trim a)
 parseBlank = do whitespace; newline; return Nothing
+parseComment = do whitespace; string "#"; anything; return Nothing
 
 optionalMessage = do
   m <- option "" (try (do {string ":"; anything}))
