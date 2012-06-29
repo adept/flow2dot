@@ -23,7 +23,9 @@ Send patches to dastapov@gmail.com (using "darcs send")
 Thanks to Cale, quicksilver and roconnor from #haskell for
 suggestions on how to modularize this. Thanks to Dema from
 haskell@conference.jabber.ru for win32 testing. Gwern0 helped
-to adapt this to GHC 6.8.2
+to adapt this to GHC 6.8.2. Radoslav Dorcik sent in parser improvements.
+Mike Shigorin and Denis Smirnov packaged for Alt Linux and provided feedback
+on compatibility with different GHC versions. Vasyl Vaskul reported bugs.
 
 Known issues
 ============
