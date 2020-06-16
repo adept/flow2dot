@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-|
 Converts flow diagrams to the Graphviz (Dot) files for subsequent rendering
 into nice pictures.
@@ -11,72 +10,47 @@ module Text.FlowDiagram ( flow2dot
                         ) where
 
 import qualified Text.Dot as D
-import Control.Monad.State (StateT, evalStateT, gets, modify, lift)
-import qualified Data.Map as M (Map, empty, lookup, insert)
-import Data.List (intercalate, unfoldr, splitAt, findIndex)
-#ifndef NATIVEUTF8
-import Prelude hiding (readFile)
-import System.IO.UTF8 (readFile)
-#endif
-import Data.Maybe (catMaybes)
+import Control.Monad.State (StateT, evalStateT, gets, modify, lift, zipWithM, zipWithM_, foldM, when)
+import qualified Data.Map as M (Map, empty, lookup, insert, union, fromList)
+import Data.List (intercalate, unfoldr, splitAt, findIndex, nub, sort)
+import System.IO (readFile)
+import Data.Maybe (catMaybes, isJust, fromMaybe)
 import Data.Char (isSpace)
-import Test.QuickCheck
-import Control.Monad (liftM, liftM2, liftM3)
 import Text.ParserCombinators.Parsec hiding (State)
 
 {-
 Idea: In order to draw sequence (flow) diagram using graphviz we can use directed layout (dot) to
 generate "skeleton" of the diagram and draw message lines and action boxes
-
-Diagram could look like this:
-strict digraph SeqDiagram
-{
-  { // Those are swimline heads
-    rank=same
-    actor [label="Some actor"];
-    system [label="Some system"];
-  }
-  { //tier1
-    rank=same
-    node[style=invis,shape=point];
-    tier1; // this is an "anchor" for 1st diagram tier
-    actor1; // this is a 1st point on "actor" swimline
-    system1; // this is a 1st point on "system" swimline
-  }
-  { //tier2
-    rank=same
-    node[style=invis,shape=point];
-    tier2; // anchor for 2nd diagram tier
-    actor2; // this is a 2nd point on "actor" swimline
-    system2; // this is a 2nd point on "system" swimline
-  }
-  // Main body
-
-  // Tiers ordering. We link "anchor" nodes and Dot will do the rest
-  tier1 -> tier2;
-
-  // Actual messages. Note the "constraint=false"
-  actor1 -> system1[label="xxx", constraint=false];
-  system2 -> actor2[label="yyy", constraint=false];
-}
 -}
 
+
+type Swimline = String
+
 -- | Flow could include messages and actions, one item per source line
-data Flow = Msg String String String
+data Flow = Msg Swimline Swimline String
           -- ^ Message (from, to, message text). Syntax in the source file: @from -> to: message text@
-          | Action String String
+          | Action Swimline String
           -- ^ Action (actor, message text). Syntax in the source file: @actor: message text@
-          | Order [String]
+          | Order [Swimline]
           -- ^ Tries to put swimlines in the specified order. Syntax: @order swimline1 swimline2 ...@
             deriving (Eq,Show)
 
+isOrder (Order _) = True
+isOrder _         = False
+
+isMsg (Msg _ _ _) = True
+isMsg _           = False
+
+names flow = nub $ flip concatMap flow $ \elt ->
+  case elt of
+    Msg from to _ -> [from,to]
+    Action a _ -> [a]
+    Order _ -> []
+    
+
 -- | State of the diagram builder
-data DiagS = DiagS { swimlines::M.Map String D.NodeId
-                   -- ^ name of the swimline, ID of the last node on it
-                   , numTier :: Int
-                   -- ^ number of the next diagram tier
-                   , headings :: [D.NodeId]
-                   -- ^ IDs of all "swimline start" nodes
+data DiagS = DiagS { nodes :: M.Map (Int,Swimline) D.NodeId
+                   -- ^ all the nodes of the graph, indexed by tier and swimline name
                    }
 
 type Diagram = StateT DiagS D.Dot
@@ -84,46 +58,97 @@ type Diagram = StateT DiagS D.Dot
 -- | 'flow2dot' take a list of flow diagram items (`Flow') and converts them to Graphviz code
 flow2dot :: [Flow] -> String
 flow2dot flow = 
-  ("strict "++) $ D.showDot $ evalStateT (flow2dot' flow) (DiagS M.empty 1 [])
+  ("strict "++) $ D.showDot $ evalStateT (flow2dot' flow) (DiagS M.empty)
     -- NB: "strict" is VERY important here
     -- Without it, "dot" segfaults while rendering diagram (dot 2.12)
 
 flow2dot' :: [Flow] -> Diagram ()
 flow2dot' flow = do
+  -- Avoid curved edges at all cost
+  attribute ("splines","line")
+  
   let order = case [ ns | Order ns <- flow ] of
                 []     -> Nothing
                 -- Only the first Order directive would be taken into account
                 (ns:_) -> Just ns
-  mapM_ (flowElement2dot order) flow
-  hs <- gets headings
-  same hs
+      flow' = filter (not.isOrder) flow
+      swimlines = names flow'
 
-flowElement2dot :: Maybe [String] -> Flow -> Diagram ()
--- Make a graph block where swimline nodes for the current tier will be put.
--- Populate tier with "tier anchor" node
+  -- check order
+  case order of
+    Just order' | sort order' /= sort swimlines -> do
+      error "order statement must mention all swimlines"
+    _ -> return ()
+  
+  -- Create nodes for flow elements
+  flip mapM_ (zip [0..] flow') $ \(tier,elt) -> do
+    namedNodes <- flowElement2dot tier order elt
+    addNodes $ M.fromList $ [ ((tier,swimline),node) | (swimline,node)<-namedNodes ]
+
+  -- Add nodes on all the remaining places on all the swimlines
+  -- We don't add nodes on the same tier as Msg elements to avoid dot trying to route
+  -- Msg edge around those invisible support nodes.
+  flip mapM_ [ (tier, sline) | sline <- swimlines
+                             , (tier,elt) <-zip [0..] flow'
+                             , not (isMsg elt) ] $ \(tier,sline) -> do
+    n <- findNode tier sline
+    case n of
+      Just _ -> return ()
+      Nothing -> do
+          id <- invisNode
+          addNodes (M.fromList [((tier,sline),id)])
+
+  -- create swimline headers
+  headers <- flip mapM (fromMaybe swimlines order) $ \sline ->
+    node [ ("label", mkHeader sline)
+         , ("shape","box")
+         ]
+  same (headers)
+
+  -- apply order, if any
+  when (isJust order) $ do
+    zipWithM_ (\h1 h2 -> edge h1 h2 [ ("style","invis")
+                                    , ("weight","1") -- this edge is weak compared to verticals
+                                    ])
+      headers (drop 1 headers)
+  
+  -- connect all nodes on all swimlines
+  -- first, lets group them by tier
+  nodesByTier <- flip mapM [ tier | (tier,_) <-zip [0..] flow' ] $ \tier ->
+    mapM (findNode tier) [ line | line <- swimlines ]
+
+  -- then, we descend through the tiers connectin nodes to the previous node on
+  -- the same swimline, starting from headers
+  _ <- foldM (\prevNodes thisTier -> do
+          same $ catMaybes thisTier
+          zipWithM (\prevNode maybeThisNode ->
+                      case maybeThisNode of
+                        Just thisNode -> do
+                          edge prevNode thisNode
+                            [("style","dotted")
+                            ,("arrowhead","none")
+                            ,("weight","1000") -- these edges want to be
+                                               -- very vertical
+                            ]
+                          return thisNode
+                        Nothing -> return prevNode)
+            prevNodes thisTier)
+         headers nodesByTier
+  return ()
+
+flowElement2dot :: Int -> Maybe [String] -> Flow -> Diagram [(String,D.NodeId)]
 -- Generate nodes for message/action on all required swimlines
--- Connect generated nodes, if necessary
--- Connect tier to previous, which will ensure that tiers are ordered properly
-flowElement2dot _ (Action actor message) = do
-  tier <- invisNode
-  l <- mkLabel message
+flowElement2dot tier _ (Action actor message) = do
+  l <- mkLabel tier message
   a <- node [("style","filled"),("shape","plaintext"),("label",l)]
-  same [tier,a]
-  connectToPrev actor a
-  connectToPrev "___tier" tier
-  incTier
+  return [(actor,a)]
 
-flowElement2dot order (Msg from to message) = do
-  tier <- invisNode
+flowElement2dot tier order (Msg from to message) = do
   f    <- invisNode
   t    <- invisNode
-  same [f,t,tier]
 
-  l <- mkLabel message
+  l <- mkLabel tier message
 
-  connectToPrev from f
-  connectToPrev to t
-  connectToPrev "___tier" tier
   let (f',t',attrs) = 
         if order == Nothing
            then (f,t,[])
@@ -132,26 +157,24 @@ flowElement2dot order (Msg from to message) = do
                          (Just x, Just y) -> if x>y then (t,f,[("dir","back")]) else (f,t,[])
                          _                -> (f,t,[])
 
-  edge f' t' $ [("label",l)] ++ attrs
-  incTier
+  edge f' t' $ [("label",l)
+               ,("constraint","false") -- avoid pushing recipient node down
+               ,("labelfloat","true") -- be a bit sloppy with label placement
+               ] ++ attrs
+  return [(from,f),(to,t)]
     
 -- Order setting is done in Msg processing
-flowElement2dot _ (Order _) = return ()
+flowElement2dot _ _ (Order _) = return []
 
-
-
-mkLabel :: String -> Diagram String
-mkLabel lbl = do
-  t <- gets numTier
-  return $ if null lbl then show t
-                       else (show t ++ ": " ++ reflow lbl)
+mkLabel :: Int -> String -> Diagram String
+mkLabel tier lbl = do
+  return $ if null lbl then ""
+                       else (show (tier+1) ++ ": " ++ reflow lbl)
 
 invisNode :: Diagram D.NodeId
 invisNode = node [("style","invis"),("shape","point")]
 
 reflow :: String -> String
--- FIXME: for now, you have to hardcode desired width/height ratio
--- FIXME: (tail $ init $ show) trick is needed to work around dotgen-0.2 limitations
 reflow str = intercalate "\n" $ map unwords $ splitInto words_in_row w
       where w = words str
             z = length w
@@ -161,27 +184,9 @@ reflow str = intercalate "\n" $ map unwords $ splitInto words_in_row w
             chunk 0 lst = Just (lst, [])
             chunk n lst = Just $ splitAt n lst
             splitInto n = unfoldr (chunk n)
+            -- FIXME: for now, you have to hardcode desired width/height ratio
             width=3
             height=1
-
--- Return the ID of the next node in the swimline `name',
--- generating all required nodes and swimline connections along the way
-connectToPrev :: String -> D.NodeId -> Diagram ()
-connectToPrev "___tier" _ = return ()
-connectToPrev sline currNode = do
-  s <- getSwimline sline
-  case s of
-       -- Swimline already exists
-       (Just prevNode) ->  do edge prevNode currNode [("style","dotted"),("arrowhead","none")]
-                              setSwimline sline currNode
-       -- Otherwise, swimline hase to be created
-       (Nothing) -> do setSwimline sline currNode
-                       -- Add heading node
-                       heading <- node [("label", mkHeader sline),("shape","box")]
-                       addHeading heading
-                       setSwimline sline heading
-                       -- Retry connecting
-                       connectToPrev sline currNode
 
 mkHeader :: String -> String
 mkHeader = map remove_underscore
@@ -193,21 +198,14 @@ mkHeader = map remove_underscore
 -- State access/modify helpers
 ------------------------------
 
-incTier :: Diagram ()
-incTier = modify (\e -> e {numTier = numTier e +1} )
+addNodes :: M.Map (Int,String) D.NodeId -> Diagram ()
+addNodes newNodes = do
+  modify (\e -> e {nodes = M.union (nodes e) newNodes})
 
-getSwimline :: String -> Diagram (Maybe D.NodeId)
-getSwimline name = do
-  s <- gets swimlines
-  return $ M.lookup name s
-
-setSwimline :: String -> D.NodeId -> Diagram ()
-setSwimline name x = do
-  modify (\e -> e {swimlines = M.insert name x (swimlines e)})
-
-addHeading :: D.NodeId -> Diagram ()
-addHeading x = do
-  modify (\e -> e {headings = x:(headings e)})
+findNode :: Int -> String -> Diagram (Maybe D.NodeId)
+findNode tier line = do
+  ns <- gets nodes
+  return $ M.lookup (tier, line) ns
 
 ------------------------------------------------
 -- Lifting Text.Dot functions to the State monad
@@ -215,6 +213,7 @@ addHeading x = do
 same = lift . D.same
 node = lift . D.node
 edge f t args = lift $ D.edge f t args
+attribute = lift . D.attribute
 
 ---------
 -- Parser
@@ -268,52 +267,9 @@ anything = try (anyChar `manyTill` newline) <|> many1 anyChar
 trim :: String -> String
 trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 
--- Parser tests
-newtype Name = Name String
-newtype Message = Message String
-
-instance Arbitrary Name where
-  arbitrary = liftM Name (listOf' $ elements "abcxyz_банк")
-
-instance Arbitrary Message where
-  -- words.unwords trick is needed to prevent Messages which contain only spaces
-  arbitrary = liftM ((Message).unwords.words) $ frequency [ (50, listOf' $ elements "abcxyz_->; 123банк")
-                                                          -- One special case which i decided to hard-code
-                                                          , (1, return "foo -> bar")
-                                                          ]
-
-instance Arbitrary Flow where
-  arbitrary = frequency [ (10, liftM3 Msg mkName mkName mkMsg)
-                        , (5, liftM2 Action mkName mkMsg)
-                        ]
-    where
-      mkName = do Name n <- arbitrary; return n
-      mkMsg = do Message m <- arbitrary; return m
-
--- Taken from a unreleased version of quickcheck
--- Just added ' to the names
---   / Kolmodin
-listOf' :: Gen a -> Gen [a]
-listOf' gen = sized $ \n ->
-  do k <- choose (1,n)
-     vectorOf' k gen
-
-vectorOf' :: Int -> Gen a -> Gen [a]
-vectorOf' k gen = sequence [ gen | _ <- [1..k] ]
-
-
 -- | Print element of the flow diagram as String
 showFlow :: Flow -> String
 showFlow (Order sl)   = "order " ++ intercalate " " sl
 showFlow (Msg f t m)  = unwords [ f, " -> ", t, ":", m ]
 showFlow (Action s a) = unwords [ s, ":", a ]
 
-prop_reparse :: [Flow] -> Bool
-prop_reparse x =
-  let txt = unlines $ map showFlow x
-      in x == parseFlow "" txt
-
-prop_russian_k :: Bool
-prop_russian_k =
-  ( parseFlow "a->b" "A->B: клиент" == [Msg "A" "B" "клиент"] ) &&
-  ( parseFlow "prod" "продавец -> клиент: подписание контракта, предоставление счета" == [Msg "продавец" "клиент" "подписание контракта, предоставление счета"] )

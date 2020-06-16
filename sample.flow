@@ -1,9 +1,9 @@
 order a b c d
-a -> b: let's play "catch a ball"!
+a -> b: let's toss a frisbee
 b -> c: i'll pass it along
-c: what to do next?
+c: where do I throw it next?
 c -> a
-a: "hello d!"
-a -> c: d wants to play too!
-c -> d: ok, here you go: catch!
-d: oops..
+a: "Hello d!"
+a -> c: "d wants to play too!"
+c -> d: "ok, catch!"
+d: oops.. frisbee fell

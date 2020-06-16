@@ -1,3 +1,11 @@
+2020-06-16
+==========
+Migrated to github, cleaned up sources
+
+Version bump to 0.9.1
+
+Pre-github Changelog
+====================
 tagged 0.7
 
   * Added Order directive (see sample.flow for usage)

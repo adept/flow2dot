@@ -13,10 +13,6 @@
 module Main where
 
 import Text.FlowDiagram
-#ifndef NATIVEUTF8
-import System.IO.UTF8 (putStrLn)
-import Prelude hiding (putStrLn)
-#endif
 import System.Environment (getArgs)
 
 main :: IO ()
