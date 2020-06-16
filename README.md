@@ -16,6 +16,10 @@ version of `dot` is at least 2.12.
 If you want to tweak the output - read Dot manual
 and use it for scaling, colors, pagination etc.
 
+Sample output
+============
+![sample.png](sample.png)
+
 Acknowledgements
 ================
 Thanks to Cale, quicksilver and roconnor from #haskell for
