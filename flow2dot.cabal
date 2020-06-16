@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 53fe3a5ecd77c08ff5a698606e70baced2b51cb4a2868c18fa8d092a9e48b557
+-- hash: d7754342824ad337314bc438ad44fa588f072e24802f3fe93f7c2115bec00f82
 
 name:           flow2dot
 version:        0.9.1
@@ -40,7 +40,7 @@ library
   build-depends:
       base >=3 && <=5
     , containers
-    , dotgen
+    , dotgen >=0.4.3
     , mtl >=1.0
     , parsec
   default-language: Haskell2010
@@ -55,7 +55,7 @@ executable flow2dot
   build-depends:
       base >=3 && <=5
     , containers
-    , dotgen
+    , dotgen >=0.4.3
     , flow2dot
     , mtl >=1.0
     , parsec
@@ -72,7 +72,7 @@ test-suite flow2dot-test
       QuickCheck
     , base >=3 && <=5
     , containers
-    , dotgen
+    , dotgen >=0.4.3
     , flow2dot
     , mtl >=1.0
     , parsec

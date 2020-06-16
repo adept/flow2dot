@@ -2,3 +2,6 @@ resolver: lts-16.0
 
 packages:
 - .
+
+extra-deps:
+- dotgen-0.4.3

@@ -23,7 +23,7 @@ dependencies:
   - mtl >= 1.0
   - containers
   - parsec
-  - dotgen
+  - dotgen >= 0.4.3
 
 library:
   source-dirs: .
