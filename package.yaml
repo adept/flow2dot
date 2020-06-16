@@ -14,7 +14,7 @@ tested-with:        GHC ==6.10.4, GHC ==8.8.3
 build-type:         Simple
 extra-source-files:
   - README.md
-  - ChangeLog
+  - ChangeLog.md
   - sample.flow
   - sample.png
 
